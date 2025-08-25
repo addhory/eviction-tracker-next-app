@@ -1,357 +1,214 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useMemo } from "react";
-import Link from "next/link";
-import { useAuth } from "@/components/providers/auth-provider";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useProperties, useTenants, useLegalCases } from "@/hooks/queries";
-import {
-  Building2,
-  Users,
-  FileText,
-  DollarSign,
-  AlertCircle,
-  Plus,
-  Eye,
-} from "lucide-react";
-import { DashboardStats } from "@/types";
-import dayjs from "dayjs";
+import { Users, FileText, Mail, Shield, ArrowRight, Home } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export default function DashboardPage() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
 
-  // Use TanStack Query hooks
-  const { data: properties = [], isLoading: propertiesLoading } = useProperties(
-    profile?.role === "admin" || profile?.role === "landlord"
-      ? user?.id
-      : undefined
-  );
-  const { data: tenants = [], isLoading: tenantsLoading } = useTenants(
-    profile?.role === "admin" || profile?.role === "landlord"
-      ? user?.id
-      : undefined
-  );
-  const { data: cases = [], isLoading: casesLoading } = useLegalCases(user?.id);
-
-  // Calculate stats using useMemo for performance
-  const stats = useMemo(() => {
-    if (!cases) return null;
-
-    const activeCases = cases.filter((c: any) =>
-      ["SUBMITTED", "IN_PROGRESS"].includes(c.status)
-    );
-    const completedCases = cases.filter((c: any) => c.status === "COMPLETE");
-    const unpaidCases = cases.filter((c: any) => c.payment_status === "UNPAID");
-    const totalRevenue = cases
-      .filter((c: any) => c.payment_status === "PAID")
-      .reduce((sum: number, c: any) => sum + (c.price || 0), 0);
-
-    return {
-      totalProperties: properties.length,
-      totalTenants: tenants.length,
-      activeCases: activeCases.length,
-      completedCases: completedCases.length,
-      unpaidCases: unpaidCases.length,
-      totalRevenue,
-    };
-  }, [properties, tenants, cases]);
-
-  const recentCases = useMemo(() => {
-    return cases.slice(0, 5);
-  }, [cases]);
-
-  const loading = propertiesLoading || tenantsLoading || casesLoading;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "NOTICE_DRAFT":
-        return "bg-gray-100 text-gray-800";
-      case "SUBMITTED":
-        return "bg-blue-100 text-blue-800";
-      case "IN_PROGRESS":
-        return "bg-yellow-100 text-yellow-800";
-      case "COMPLETE":
-        return "bg-green-100 text-green-800";
-      case "CANCELLED":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  // Dummy data - will be replaced with real data later
+  const stats = {
+    totalTenants: 5,
+    activeRequests: 4,
+    totalProperties: 3,
+    completedCases: 12,
   };
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case "PAID":
-        return "bg-green-100 text-green-800";
-      case "PARTIAL":
-        return "bg-yellow-100 text-yellow-800";
-      case "UNPAID":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-3 w-32" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const quickActions = [
+    {
+      icon: Users,
+      title: "Manage Tenants",
+      description: "Add, edit, or view tenant information",
+      href: "/dashboard/tenants",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      icon: FileText,
+      title: "Submit New Request",
+      description: "Start a new eviction case",
+      href: "/dashboard/cases/new",
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      icon: Mail,
+      title: "Email the Office",
+      description: "Contact support or ask questions",
+      href: "mailto:support@evictiontracker.com",
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome back, {profile?.name || "User"}!
+    <div className="space-y-6 px-4 sm:px-6 lg:px-8">
+      {/* Welcome Header */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Welcome, {profile?.name?.split(" ")[0] || "Landlord"}!
         </h1>
-        <p className="text-muted-foreground">
-          Here&apos;s what&apos;s happening with your eviction cases today.
+        <p className="text-gray-600">
+          Here&apos;s an overview of your eviction management dashboard
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {(profile?.role === "admin" || profile?.role === "landlord") && (
-          <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Properties
-                </CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {stats?.totalProperties || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Properties under management
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Tenants
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {stats?.totalTenants || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Active tenant relationships
-                </p>
-              </CardContent>
-            </Card>
-          </>
-        )}
-
-        <Card>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Cases</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total Tenants
+            </CardTitle>
+            <Users className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.activeCases || 0}</div>
-            <p className="text-xs text-muted-foreground">Cases in progress</p>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats.totalTenants}
+            </div>
+            <Link
+              href="/dashboard/tenants"
+              className="text-xs text-green-600 hover:text-green-700 flex items-center mt-1"
+            >
+              View Details
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </Link>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unpaid Cases</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Active Requests
+            </CardTitle>
+            <Shield className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.unpaidCases || 0}</div>
-            <p className="text-xs text-muted-foreground">Requiring payment</p>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats.activeRequests}
+            </div>
+            <Link
+              href="/dashboard/cases"
+              className="text-xs text-green-600 hover:text-green-700 flex items-center mt-1"
+            >
+              View Details
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </Link>
           </CardContent>
         </Card>
 
-        {(profile?.role === "admin" || profile?.role === "landlord") && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ${(stats?.totalRevenue || 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                From completed cases
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total Properties
+            </CardTitle>
+            <Home className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats.totalProperties}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Across Maryland counties
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Completed Cases
+            </CardTitle>
+            <FileText className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats.completedCases}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">This year</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks to get started quickly</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {(profile?.role === "admin" || profile?.role === "landlord") && (
-              <>
-                <Button asChild className="h-auto p-4 flex-col items-start">
-                  <Link href="/dashboard/properties/new">
-                    <Plus className="h-6 w-6 mb-2" />
-                    <span className="font-medium">Add Property</span>
-                    <span className="text-sm text-muted-foreground">
-                      Register a new rental property
-                    </span>
-                  </Link>
-                </Button>
-
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-auto p-4 flex-col items-start"
-                >
-                  <Link href="/dashboard/tenants/new">
-                    <Users className="h-6 w-6 mb-2" />
-                    <span className="font-medium">Add Tenant</span>
-                    <span className="text-sm text-muted-foreground">
-                      Register new tenant information
-                    </span>
-                  </Link>
-                </Button>
-              </>
-            )}
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto p-4 flex-col items-start"
-            >
-              <Link href="/dashboard/cases/new">
-                <FileText className="h-6 w-6 mb-2" />
-                <span className="font-medium">Start Eviction Case</span>
-                <span className="text-sm text-muted-foreground">
-                  Begin a new FTPR case
-                </span>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Cases */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Recent Cases</CardTitle>
-            <CardDescription>Your most recent eviction cases</CardDescription>
-          </div>
-          <Button asChild variant="ghost">
-            <Link href="/dashboard/cases">
-              <Eye className="h-4 w-4 mr-2" />
-              View All
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {recentCases.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No cases yet</p>
-              <p className="text-sm">
-                Start your first eviction case to see it here
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {recentCases.map((case_: any) => (
-                <div
-                  key={case_.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <p className="font-medium">
-                        {case_.property?.address}
-                        {case_.property?.unit &&
-                          ` - Unit ${case_.property.unit}`}
-                      </p>
-                      <Badge
-                        variant="secondary"
-                        className={getStatusColor(case_.status)}
-                      >
-                        {case_.status.replace("_", " ")}
-                      </Badge>
-                      <Badge
-                        variant="secondary"
-                        className={getPaymentStatusColor(case_.payment_status)}
-                      >
-                        {case_.payment_status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Tenant: {case_.tenant?.tenant_names?.join(", ")} • Filed:{" "}
-                      {dayjs(case_.date_initiated).format("MMM D, YYYY")} •
-                      Amount: ${case_.price.toLocaleString()}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Quick Actions
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {quickActions.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={index}
+                href={action.href}
+                className="group block p-4 rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-md transition-all duration-200"
+              >
+                <div className="flex items-start space-x-3">
+                  <div
+                    className={`p-2 rounded-lg ${action.bgColor} group-hover:scale-110 transition-transform`}
+                  >
+                    <Icon className={`h-5 w-5 ${action.color}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-medium text-gray-900 group-hover:text-green-600 transition-colors">
+                      {action.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {action.description}
                     </p>
                   </div>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href={`/dashboard/cases/${case_.id}`}>View</Link>
-                  </Button>
                 </div>
-              ))}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Recent Activity Preview */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Recent Activity
+          </h2>
+          <Button variant="outline" size="sm">
+            View All
+          </Button>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between py-2 border-b border-gray-100">
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-sm text-gray-900">
+                New eviction case submitted for John Doe
+              </span>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <Badge variant="secondary">2 hours ago</Badge>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-gray-100">
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-sm text-gray-900">
+                Payment received for case #D-02-CV-24-222222
+              </span>
+            </div>
+            <Badge variant="secondary">1 day ago</Badge>
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              <span className="text-sm text-gray-900">
+                Document generated for Peter Jones case
+              </span>
+            </div>
+            <Badge variant="secondary">3 days ago</Badge>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -36,14 +36,14 @@ import { Loader2, Plus, X } from "lucide-react";
 const tenantSchema = z.object({
   property_id: z.string().min(1, "Please select a property"),
   tenant_names: z
-    .array(z.string().min(1, "Name cannot be empty"))
+    .array(z.object({ name: z.string().min(1, "Name cannot be empty") }))
     .min(1, "At least one tenant name is required"),
   email: z.string().email("Invalid email format").optional().or(z.literal("")),
   phone: z.string().optional(),
   lease_start_date: z.string().optional(),
   lease_end_date: z.string().optional(),
   rent_amount: z.number().min(0, "Rent amount must be positive").optional(),
-  is_subsidized: z.boolean().default(false),
+  is_subsidized: z.boolean(),
   subsidy_type: z.string().optional(),
 });
 
@@ -72,7 +72,7 @@ export function TenantForm({
     resolver: zodResolver(tenantSchema),
     defaultValues: {
       property_id: "",
-      tenant_names: [""],
+      tenant_names: [{ name: "" }],
       email: "",
       phone: "",
       lease_start_date: "",
@@ -95,7 +95,11 @@ export function TenantForm({
     // Filter out empty tenant names
     const filteredData = {
       ...data,
-      tenant_names: data.tenant_names.filter((name) => name.trim() !== ""),
+      tenant_names: data.tenant_names
+        .filter((name) => {
+          return name.name.trim() !== "";
+        })
+        .map((item) => item.name),
       email: data.email || undefined,
       phone: data.phone || undefined,
       lease_start_date: data.lease_start_date || undefined,
@@ -194,7 +198,7 @@ export function TenantForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append("")}
+                onClick={() => append({ name: "" })}
                 disabled={
                   createTenantMutation.isPending ||
                   updateTenantMutation.isPending

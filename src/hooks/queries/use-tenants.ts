@@ -24,7 +24,7 @@ const tenantService = {
         `
         *,
         property:properties(*),
-        landlord:profiles(*)
+        landlord:profiles!tenants_landlord_id_fkey(*)
       `
       )
       .eq("landlord_id", landlordId)
@@ -42,7 +42,7 @@ const tenantService = {
         `
         *,
         property:properties(*),
-        landlord:profiles(*)
+        landlord:profiles!tenants_landlord_id_fkey(*)
       `
       )
       .eq("property_id", propertyId)
@@ -60,7 +60,7 @@ const tenantService = {
         `
         *,
         property:properties(*),
-        landlord:profiles(*)
+        landlord:profiles!tenants_landlord_id_fkey(*)
       `
       )
       .eq("id", tenantId)
@@ -82,7 +82,7 @@ const tenantService = {
         `
         *,
         property:properties(*),
-        landlord:profiles(*)
+        landlord:profiles!tenants_landlord_id_fkey(*)
       `
       )
       .single();
@@ -101,7 +101,7 @@ const tenantService = {
         `
         *,
         property:properties(*),
-        landlord:profiles(*)
+        landlord:profiles!tenants_landlord_id_fkey(*)
       `
       )
       .single();
@@ -212,6 +212,11 @@ export function useDeleteTenant() {
       // Invalidate all property-based lists
       queryClient.invalidateQueries({
         queryKey: [...tenantKeys.all, "property"],
+        exact: false,
+      });
+      // Invalidate tenant-property combined lists
+      queryClient.invalidateQueries({
+        queryKey: ["tenant-properties"],
         exact: false,
       });
     },

@@ -31,11 +31,11 @@ const propertySchema = z.object({
   address: z.string().min(5, "Address must be at least 5 characters"),
   unit: z.string().optional(),
   city: z.string().min(2, "City must be at least 2 characters"),
-  state: z.string().default("MD"),
+  state: z.string(),
   zip_code: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid ZIP code format"),
   county: z.string().min(1, "Please select a county"),
   property_type: z.enum(["RESIDENTIAL", "COMMERCIAL"], {
-    required_error: "Please select a property type",
+    error: "Please select a property type",
   }),
   bedrooms: z.number().min(0).optional(),
   bathrooms: z.number().min(0).optional(),

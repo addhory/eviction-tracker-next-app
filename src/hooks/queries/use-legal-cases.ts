@@ -2,18 +2,16 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { LegalCaseFormData, CaseStatus, PaymentStatus } from "@/types";
-import { EmailService } from "@/services/email-service";
 
 const legalCaseKeys = {
-  all: ["legalCases"] as const,
+  all: ["legal-cases"] as const,
   lists: () => [...legalCaseKeys.all, "list"] as const,
   list: (landlordId: string) => [...legalCaseKeys.lists(), landlordId] as const,
   detail: (caseId: string) => [...legalCaseKeys.all, "detail", caseId] as const,
-  byStatus: (landlordId: string, status: CaseStatus) =>
-    [...legalCaseKeys.all, "status", landlordId, status] as const,
-  byPaymentStatus: (landlordId: string, paymentStatus: PaymentStatus) =>
-    [...legalCaseKeys.all, "paymentStatus", landlordId, paymentStatus] as const,
+  byProperty: (propertyId: string) =>
+    [...legalCaseKeys.all, "property", propertyId] as const,
+  byTenant: (tenantId: string) =>
+    [...legalCaseKeys.all, "tenant", tenantId] as const,
 };
 
 // Legal case service functions
@@ -27,7 +25,7 @@ const legalCaseService = {
         *,
         property:properties(*),
         tenant:tenants(*),
-        landlord:profiles(*)
+        landlord:profiles!legal_cases_landlord_id_fkey(*)
       `
       )
       .eq("landlord_id", landlordId)
@@ -46,7 +44,7 @@ const legalCaseService = {
         *,
         property:properties(*),
         tenant:tenants(*),
-        landlord:profiles(*)
+        landlord:profiles!legal_cases_landlord_id_fkey(*)
       `
       )
       .eq("id", caseId)
@@ -56,81 +54,119 @@ const legalCaseService = {
     return data;
   },
 
-  async createLegalCase(landlordId: string, caseData: LegalCaseFormData) {
+  async getLegalCasesByProperty(propertyId: string) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("legal_cases")
-      .insert({
-        landlord_id: landlordId,
-        status: "NOTICE_DRAFT" as CaseStatus,
-        payment_status: "UNPAID" as PaymentStatus,
-        ...caseData,
-      })
       .select(
         `
         *,
         property:properties(*),
         tenant:tenants(*),
-        landlord:profiles(*)
+        landlord:profiles!legal_cases_landlord_id_fkey(*)
+      `
+      )
+      .eq("property_id", propertyId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getLegalCasesByTenant(tenantId: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("legal_cases")
+      .select(
+        `
+        *,
+        property:properties(*),
+        tenant:tenants(*),
+        landlord:profiles!legal_cases_landlord_id_fkey(*)
+      `
+      )
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async createLegalCase(
+    landlordId: string,
+    data: {
+      tenant_id: string;
+      property_id: string;
+      case_type: "FTPR" | "HOLDOVER" | "OTHER";
+      date_initiated: string;
+      current_rent_owed: number;
+      price: number;
+      no_right_of_redemption: boolean;
+      district_court_case_number: string;
+      warrant_order_date: string;
+      initial_eviction_date: string;
+      signature_name?: string;
+    }
+  ) {
+    const supabase = createClient();
+
+    // Format the data for insertion
+    const insertData = {
+      landlord_id: landlordId,
+      property_id: data.property_id,
+      tenant_id: data.tenant_id,
+      case_type: "FTPR" as const, // Default case type for eviction letters
+      date_initiated: data.date_initiated,
+      rent_owed_at_filing: data.current_rent_owed,
+      current_rent_owed: data.current_rent_owed,
+      status: "NOTICE_DRAFT" as const, // Initial status
+      payment_status: "UNPAID" as const, // Initial payment status
+      price: data.price,
+      no_right_of_redemption: data.no_right_of_redemption,
+      district_court_case_number: data.district_court_case_number,
+      warrant_order_date: data.warrant_order_date,
+      initial_eviction_date: data.initial_eviction_date,
+      generated_documents: {
+        signature_name: data.signature_name,
+      },
+    };
+
+    const { data: result, error } = await supabase
+      .from("legal_cases")
+      .insert(insertData)
+      .select(
+        `
+        *,
+        property:properties(*),
+        tenant:tenants(*),
+        landlord:profiles!legal_cases_landlord_id_fkey(*)
       `
       )
       .single();
 
     if (error) throw error;
-
-    // Send email notification for case creation
-    if (data && data.property && data.tenant && data.landlord) {
-      try {
-        await EmailService.sendCaseCreatedNotification(
-          data,
-          data.property,
-          data.tenant,
-          data.landlord
-        );
-      } catch (emailError) {
-        // Log email error but don't fail the case creation
-        console.error("Failed to send case creation email:", emailError);
-      }
-    }
-
-    return data;
+    return result;
   },
 
   async updateLegalCase(
     caseId: string,
-    updates: Partial<
-      LegalCaseFormData & {
-        status?: CaseStatus;
-        payment_status?: PaymentStatus;
-        court_case_number?: string;
-        trial_date?: string;
-        court_hearing_date?: string;
-        court_outcome_notes?: string;
-        notice_mailed_date?: string;
-        warrant_order_date?: string;
-        initial_eviction_date?: string;
-        thirty_day_notice_file_name?: string;
-        generated_documents?: Record<string, unknown>;
-        payments_made?: Record<string, unknown>[];
-      }
-    >
+    updates: Partial<{
+      status:
+        | "NOTICE_DRAFT"
+        | "SUBMITTED"
+        | "IN_PROGRESS"
+        | "COMPLETE"
+        | "CANCELLED";
+      payment_status: "UNPAID" | "PAID" | "PARTIAL";
+      current_rent_owed: number;
+      court_case_number: string;
+      trial_date: string;
+      court_hearing_date: string;
+      court_outcome_notes: string;
+      generated_documents: Record<string, any>;
+    }>
   ) {
     const supabase = createClient();
-
-    // Get the current case data before updating
-    const { data: currentCase } = await supabase
-      .from("legal_cases")
-      .select(
-        `
-        *,
-        property:properties(*),
-        tenant:tenants(*),
-        landlord:profiles(*)
-      `
-      )
-      .eq("id", caseId)
-      .single();
-
     const { data, error } = await supabase
       .from("legal_cases")
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -140,38 +176,12 @@ const legalCaseService = {
         *,
         property:properties(*),
         tenant:tenants(*),
-        landlord:profiles(*)
+        landlord:profiles!legal_cases_landlord_id_fkey(*)
       `
       )
       .single();
 
     if (error) throw error;
-
-    // Send email notification for status changes
-    if (
-      data &&
-      data.property &&
-      data.tenant &&
-      data.landlord &&
-      currentCase &&
-      updates.status &&
-      updates.status !== currentCase.status
-    ) {
-      try {
-        await EmailService.sendCaseStatusUpdateNotification(
-          data,
-          data.property,
-          data.tenant,
-          data.landlord,
-          currentCase.status,
-          updates.status
-        );
-      } catch (emailError) {
-        // Log email error but don't fail the update
-        console.error("Failed to send status update email:", emailError);
-      }
-    }
-
     return data;
   },
 
@@ -183,49 +193,6 @@ const legalCaseService = {
       .eq("id", caseId);
 
     if (error) throw error;
-  },
-
-  async getCasesByStatus(landlordId: string, status: CaseStatus) {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("legal_cases")
-      .select(
-        `
-        *,
-        property:properties(*),
-        tenant:tenants(*),
-        landlord:profiles(*)
-      `
-      )
-      .eq("landlord_id", landlordId)
-      .eq("status", status)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return data;
-  },
-
-  async getCasesByPaymentStatus(
-    landlordId: string,
-    paymentStatus: PaymentStatus
-  ) {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("legal_cases")
-      .select(
-        `
-        *,
-        property:properties(*),
-        tenant:tenants(*),
-        landlord:profiles(*)
-      `
-      )
-      .eq("landlord_id", landlordId)
-      .eq("payment_status", paymentStatus)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return data;
   },
 };
 
@@ -248,24 +215,20 @@ export function useLegalCase(caseId?: string) {
   });
 }
 
-export function useCasesByStatus(landlordId?: string, status?: CaseStatus) {
+export function useLegalCasesByProperty(propertyId?: string) {
   return useQuery({
-    queryKey: legalCaseKeys.byStatus(landlordId!, status!),
-    queryFn: () => legalCaseService.getCasesByStatus(landlordId!, status!),
-    enabled: !!landlordId && !!status,
+    queryKey: legalCaseKeys.byProperty(propertyId!),
+    queryFn: () => legalCaseService.getLegalCasesByProperty(propertyId!),
+    enabled: !!propertyId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
-export function useCasesByPaymentStatus(
-  landlordId?: string,
-  paymentStatus?: PaymentStatus
-) {
+export function useLegalCasesByTenant(tenantId?: string) {
   return useQuery({
-    queryKey: legalCaseKeys.byPaymentStatus(landlordId!, paymentStatus!),
-    queryFn: () =>
-      legalCaseService.getCasesByPaymentStatus(landlordId!, paymentStatus!),
-    enabled: !!landlordId && !!paymentStatus,
+    queryKey: legalCaseKeys.byTenant(tenantId!),
+    queryFn: () => legalCaseService.getLegalCasesByTenant(tenantId!),
+    enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -277,27 +240,38 @@ export function useCreateLegalCase() {
   return useMutation({
     mutationFn: (variables: {
       landlordId: string;
-      caseData: LegalCaseFormData;
+      data: {
+        tenant_id: string;
+        property_id: string;
+        case_type: "FTPR" | "HOLDOVER" | "OTHER";
+        date_initiated: string;
+        current_rent_owed: number;
+        price: number;
+        no_right_of_redemption: boolean;
+        district_court_case_number: string;
+        warrant_order_date: string;
+        initial_eviction_date: string;
+        signature_name?: string;
+      };
     }) =>
-      legalCaseService.createLegalCase(
-        variables.landlordId,
-        variables.caseData
-      ),
+      legalCaseService.createLegalCase(variables.landlordId, variables.data),
     onSuccess: (data, variables) => {
       // Invalidate and refetch legal cases list
       queryClient.invalidateQueries({
         queryKey: legalCaseKeys.list(variables.landlordId),
       });
-      // Invalidate status-based queries
-      queryClient.invalidateQueries({
-        queryKey: [...legalCaseKeys.all, "status", variables.landlordId],
-        exact: false,
-      });
-      // Invalidate payment status-based queries
-      queryClient.invalidateQueries({
-        queryKey: [...legalCaseKeys.all, "paymentStatus", variables.landlordId],
-        exact: false,
-      });
+      // Also invalidate cases by property if property_id is available
+      if (data.property_id) {
+        queryClient.invalidateQueries({
+          queryKey: legalCaseKeys.byProperty(data.property_id),
+        });
+      }
+      // Invalidate cases by tenant if tenant_id is available
+      if (data.tenant_id) {
+        queryClient.invalidateQueries({
+          queryKey: legalCaseKeys.byTenant(data.tenant_id),
+        });
+      }
       // Invalidate all lists to be safe
       queryClient.invalidateQueries({ queryKey: legalCaseKeys.lists() });
     },
@@ -310,38 +284,38 @@ export function useUpdateLegalCase() {
   return useMutation({
     mutationFn: (variables: {
       caseId: string;
-      updates: Partial<
-        LegalCaseFormData & {
-          status?: CaseStatus;
-          payment_status?: PaymentStatus;
-          court_case_number?: string;
-          trial_date?: string;
-          court_hearing_date?: string;
-          court_outcome_notes?: string;
-          notice_mailed_date?: string;
-          warrant_order_date?: string;
-          initial_eviction_date?: string;
-          thirty_day_notice_file_name?: string;
-          generated_documents?: Record<string, unknown>;
-          payments_made?: Record<string, unknown>[];
-        }
-      >;
+      updates: Partial<{
+        status:
+          | "NOTICE_DRAFT"
+          | "SUBMITTED"
+          | "IN_PROGRESS"
+          | "COMPLETE"
+          | "CANCELLED";
+        payment_status: "UNPAID" | "PAID" | "PARTIAL";
+        current_rent_owed: number;
+        court_case_number: string;
+        trial_date: string;
+        court_hearing_date: string;
+        court_outcome_notes: string;
+        generated_documents: Record<string, any>;
+      }>;
     }) => legalCaseService.updateLegalCase(variables.caseId, variables.updates),
     onSuccess: (data, variables) => {
       // Update the specific case in cache
       queryClient.setQueryData(legalCaseKeys.detail(variables.caseId), data);
       // Invalidate lists to refetch updated data
       queryClient.invalidateQueries({ queryKey: legalCaseKeys.lists() });
-      // Invalidate status-based queries since status might have changed
-      queryClient.invalidateQueries({
-        queryKey: [...legalCaseKeys.all, "status"],
-        exact: false,
-      });
-      // Invalidate payment status-based queries since payment status might have changed
-      queryClient.invalidateQueries({
-        queryKey: [...legalCaseKeys.all, "paymentStatus"],
-        exact: false,
-      });
+      // Invalidate property-specific and tenant-specific case lists
+      if (data.property_id) {
+        queryClient.invalidateQueries({
+          queryKey: legalCaseKeys.byProperty(data.property_id),
+        });
+      }
+      if (data.tenant_id) {
+        queryClient.invalidateQueries({
+          queryKey: legalCaseKeys.byTenant(data.tenant_id),
+        });
+      }
     },
   });
 }
@@ -356,13 +330,13 @@ export function useDeleteLegalCase() {
       queryClient.removeQueries({ queryKey: legalCaseKeys.detail(caseId) });
       // Invalidate lists to refetch without deleted case
       queryClient.invalidateQueries({ queryKey: legalCaseKeys.lists() });
-      // Invalidate status and payment status queries
+      // Invalidate all property and tenant-based lists
       queryClient.invalidateQueries({
-        queryKey: [...legalCaseKeys.all, "status"],
+        queryKey: [...legalCaseKeys.all, "property"],
         exact: false,
       });
       queryClient.invalidateQueries({
-        queryKey: [...legalCaseKeys.all, "paymentStatus"],
+        queryKey: [...legalCaseKeys.all, "tenant"],
         exact: false,
       });
     },

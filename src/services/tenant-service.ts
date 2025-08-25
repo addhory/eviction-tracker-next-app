@@ -12,7 +12,7 @@ export class TenantService {
           `
           *,
           property:properties(*),
-          landlord:profiles(*)
+          landlord:profiles!tenants_landlord_id_fkey(*)
         `
         )
         .eq("landlord_id", landlordId)
@@ -33,7 +33,7 @@ export class TenantService {
           `
           *,
           property:properties(*),
-          landlord:profiles(*)
+          landlord:profiles!tenants_landlord_id_fkey(*)
         `
         )
         .eq("property_id", propertyId)
@@ -54,7 +54,7 @@ export class TenantService {
           `
           *,
           property:properties(*),
-          landlord:profiles(*)
+          landlord:profiles!tenants_landlord_id_fkey(*)
         `
         )
         .eq("id", tenantId)
@@ -79,7 +79,7 @@ export class TenantService {
           `
           *,
           property:properties(*),
-          landlord:profiles(*)
+          landlord:profiles!tenants_landlord_id_fkey(*)
         `
         )
         .single();
@@ -101,7 +101,7 @@ export class TenantService {
           `
           *,
           property:properties(*),
-          landlord:profiles(*)
+          landlord:profiles!tenants_landlord_id_fkey(*)
         `
         )
         .single();

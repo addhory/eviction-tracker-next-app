@@ -116,7 +116,7 @@ const adminService = {
 
     // Group cases by county
     const casesByCounty =
-      cases?.reduce((acc: Record<string, number>, case_) => {
+      cases?.reduce((acc: Record<string, number>, case_: any) => {
         const county = case_.properties?.county || "Unknown";
         acc[county] = (acc[county] || 0) + 1;
         return acc;
@@ -124,7 +124,7 @@ const adminService = {
 
     // Get recent activity (simplified for this example)
     const recentActivity = [
-      ...(cases?.slice(-5).map((case_) => ({
+      ...(cases?.slice(-5).map((case_: any) => ({
         id: case_.id || Math.random().toString(),
         type: "case_created" as const,
         description: `New case created`,
@@ -209,12 +209,80 @@ const adminService = {
     return data;
   },
 
-  async deleteUser(userId: string) {
+  async deleteUser(userId: string, userRole?: string) {
     const supabase = createClient();
-    // Note: This will cascade delete due to foreign key constraints
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
+
+    // Call the secure Edge Function instead of direct database deletion
+    // This ensures both profile and auth user are properly deleted
+    const { data, error } = await supabase.functions.invoke("delete-user", {
+      body: {
+        userId: userId,
+        userRole: userRole, // Optional: for additional security validation
+      },
+    });
 
     if (error) throw error;
+    return data;
+  },
+
+  async adminResetUserPassword(userId: string) {
+    const supabase = createClient();
+
+    // First get the user's email from profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .single();
+
+    if (profileError) throw profileError;
+    if (!profile?.email) throw new Error("User email not found");
+
+    // Send password reset email using Supabase Auth
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      profile.email,
+      {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      }
+    );
+
+    if (resetError) throw resetError;
+
+    // Log the action using our database function for audit trail
+    try {
+      await supabase.rpc("admin_reset_user_password", {
+        target_user_id: userId,
+      });
+    } catch (logError) {
+      // Don't fail if logging fails, but log it
+      console.warn("Failed to log password reset action:", logError);
+    }
+
+    return {
+      success: true,
+      message: "Password reset email sent successfully",
+      user_email: profile.email,
+    };
+  },
+
+  async adminCreateUser(userData: {
+    email: string;
+    password: string;
+    metadata: any;
+  }) {
+    const supabase = createClient();
+
+    // Use standard signup, but the admin RLS policies will allow this
+    const { data, error } = await supabase.auth.signUp({
+      email: userData.email,
+      password: userData.password,
+      options: {
+        data: userData.metadata,
+      },
+    });
+
+    if (error) throw error;
+    return data;
   },
 
   async getSystemHealth() {
@@ -260,7 +328,7 @@ export function useUsers(filters?: {
     queryKey: adminKeys.usersList(filters),
     queryFn: () => adminService.getUsers(filters),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    keepPreviousData: true, // Keep previous data while loading new page
+    // keepPreviousData: true, // Keep previous data while loading new page
   });
 }
 
@@ -293,9 +361,46 @@ export function useDeleteUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (userId: string) => adminService.deleteUser(userId),
+    mutationFn: (variables: string | { userId: string; userRole?: string }) => {
+      // Support both legacy string usage and new object with userRole
+      if (typeof variables === "string") {
+        return adminService.deleteUser(variables);
+      } else {
+        return adminService.deleteUser(variables.userId, variables.userRole);
+      }
+    },
     onSuccess: () => {
       // Invalidate users list to refetch without deleted user
+      queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+      // Invalidate stats since user counts will change
+      queryClient.invalidateQueries({ queryKey: adminKeys.stats() });
+    },
+  });
+}
+
+export function useAdminResetUserPassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => adminService.adminResetUserPassword(userId),
+    onSuccess: () => {
+      // Optionally invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+    },
+  });
+}
+
+export function useAdminCreateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userData: {
+      email: string;
+      password: string;
+      metadata: any;
+    }) => adminService.adminCreateUser(userData),
+    onSuccess: () => {
+      // Invalidate users list to show new user
       queryClient.invalidateQueries({ queryKey: adminKeys.users() });
       // Invalidate stats since user counts will change
       queryClient.invalidateQueries({ queryKey: adminKeys.stats() });

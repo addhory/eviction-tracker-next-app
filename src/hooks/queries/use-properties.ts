@@ -23,7 +23,7 @@ const propertyService = {
       .select(
         `
         *,
-        landlord:profiles(*)
+        landlord:profiles!properties_landlord_id_fkey(*)
       `
       )
       .eq("landlord_id", landlordId)
@@ -40,7 +40,7 @@ const propertyService = {
       .select(
         `
         *,
-        landlord:profiles(*)
+        landlord:profiles!properties_landlord_id_fkey(*)
       `
       )
       .eq("id", propertyId)
@@ -61,7 +61,7 @@ const propertyService = {
       .select(
         `
         *,
-        landlord:profiles(*)
+        landlord:profiles!properties_landlord_id_fkey(*)
       `
       )
       .single();
@@ -79,7 +79,7 @@ const propertyService = {
       .select(
         `
         *,
-        landlord:profiles(*)
+        landlord:profiles!properties_landlord_id_fkey(*)
       `
       )
       .single();
@@ -105,7 +105,7 @@ const propertyService = {
       .select(
         `
         *,
-        landlord:profiles(*)
+        landlord:profiles!properties_landlord_id_fkey(*)
       `
       )
       .eq("county", county)

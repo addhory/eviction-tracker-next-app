@@ -116,7 +116,7 @@ export class AdminService {
 
       // Group cases by county
       const casesByCounty =
-        cases?.reduce((acc, c) => {
+        cases?.reduce((acc, c: any) => {
           const county = c.properties?.county || "Unknown";
           acc[county] = (acc[county] || 0) + 1;
           return acc;
@@ -170,7 +170,7 @@ export class AdminService {
           )
           .slice(0, 10) || [];
 
-      const recentActivity = recentCases.map((c) => ({
+      const recentActivity = recentCases.map((c: any) => ({
         id: c.id || "",
         type: "case_created" as const,
         description: `New ${c.case_type || "FTPR"} case created`,
@@ -278,15 +278,25 @@ export class AdminService {
     }
   }
 
-  async deleteUser(userId: string): Promise<{ error: Error | null }> {
+  async deleteUser(
+    userId: string,
+    userRole?: string
+  ): Promise<{ error: Error | null }> {
     try {
-      // Note: This should cascade delete related data based on your database constraints
-      const { error } = await this.supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userId);
+      // Call the secure Edge Function instead of direct database deletion
+      // This ensures both profile and auth user are properly deleted
+      const { data, error } = await this.supabase.functions.invoke(
+        "delete-user",
+        {
+          body: {
+            userId: userId,
+            userRole: userRole, // Optional: for additional security validation
+          },
+        }
+      );
 
       if (error) throw error;
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };

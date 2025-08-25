@@ -193,6 +193,15 @@ export type Database = {
           district_court_case_number: string | null;
           warrant_order_date: string | null;
           initial_eviction_date: string | null;
+          contractor_id: string | null;
+          contractor_status:
+            | "UNASSIGNED"
+            | "ASSIGNED"
+            | "IN_PROGRESS"
+            | "COMPLETED";
+          contractor_assigned_date: string | null;
+          contractor_completed_date: string | null;
+          contractor_notes: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -226,6 +235,15 @@ export type Database = {
           district_court_case_number?: string | null;
           warrant_order_date?: string | null;
           initial_eviction_date?: string | null;
+          contractor_id?: string | null;
+          contractor_status?:
+            | "UNASSIGNED"
+            | "ASSIGNED"
+            | "IN_PROGRESS"
+            | "COMPLETED";
+          contractor_assigned_date?: string | null;
+          contractor_completed_date?: string | null;
+          contractor_notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -259,6 +277,15 @@ export type Database = {
           district_court_case_number?: string | null;
           warrant_order_date?: string | null;
           initial_eviction_date?: string | null;
+          contractor_id?: string | null;
+          contractor_status?:
+            | "UNASSIGNED"
+            | "ASSIGNED"
+            | "IN_PROGRESS"
+            | "COMPLETED";
+          contractor_assigned_date?: string | null;
+          contractor_completed_date?: string | null;
+          contractor_notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };

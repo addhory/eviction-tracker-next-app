@@ -37,13 +37,13 @@ const legalCaseSchema = z.object({
   property_id: z.string().min(1, "Please select a property"),
   tenant_id: z.string().min(1, "Please select a tenant"),
   case_type: z.enum(["FTPR", "HOLDOVER", "OTHER"], {
-    required_error: "Please select a case type",
+    message: "Please select a case type",
   }),
   date_initiated: z.string().min(1, "Date is required"),
   rent_owed_at_filing: z.number().min(0, "Amount must be positive"),
   current_rent_owed: z.number().min(0, "Amount must be positive"),
   price: z.number().min(0, "Price must be positive"),
-  no_right_of_redemption: z.boolean().default(false),
+  no_right_of_redemption: z.boolean(),
   late_fees_charged: z.number().min(0, "Amount must be positive").optional(),
   court_case_number: z.string().optional(),
   trial_date: z.string().optional(),
@@ -167,10 +167,12 @@ export function LegalCaseForm({
       if (caseId) {
         // Update existing case
         const { data: updatedCase, error } =
-          await legalCaseService.updateLegalCase(caseId, processedData);
+          (await legalCaseService.updateLegalCase(caseId, processedData)) || {};
 
         if (error) {
-          setError(error.message || "Failed to update legal case");
+          setError(
+            ((error as any)?.message as string) || "Failed to update legal case"
+          );
           return;
         }
 
@@ -185,7 +187,9 @@ export function LegalCaseForm({
         );
 
         if (error) {
-          setError(error.message || "Failed to create legal case");
+          setError(
+            ((error as any)?.message as string) || "Failed to create legal case"
+          );
           return;
         }
 

@@ -11,7 +11,7 @@ export class PropertyService {
         .select(
           `
           *,
-          landlord:profiles(*)
+          landlord:profiles!properties_landlord_id_fkey(*)
         `
         )
         .eq("landlord_id", landlordId)
@@ -31,7 +31,7 @@ export class PropertyService {
         .select(
           `
           *,
-          landlord:profiles(*)
+          landlord:profiles!properties_landlord_id_fkey(*)
         `
         )
         .eq("id", propertyId)
@@ -55,7 +55,7 @@ export class PropertyService {
         .select(
           `
           *,
-          landlord:profiles(*)
+          landlord:profiles!properties_landlord_id_fkey(*)
         `
         )
         .single();
@@ -76,7 +76,7 @@ export class PropertyService {
         .select(
           `
           *,
-          landlord:profiles(*)
+          landlord:profiles!properties_landlord_id_fkey(*)
         `
         )
         .single();
@@ -109,7 +109,7 @@ export class PropertyService {
         .select(
           `
           *,
-          landlord:profiles(*)
+          landlord:profiles!properties_landlord_id_fkey(*)
         `
         )
         .eq("county", county)

@@ -14,7 +14,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .eq("landlord_id", landlordId)
@@ -36,7 +36,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .eq("id", caseId)
@@ -64,7 +64,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .single();
@@ -120,7 +120,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .eq("id", caseId)
@@ -135,7 +135,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .single();
@@ -196,7 +196,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .eq("landlord_id", landlordId)
@@ -222,7 +222,7 @@ export class LegalCaseService {
           *,
           property:properties(*),
           tenant:tenants(*),
-          landlord:profiles(*)
+          landlord:profiles!legal_cases_landlord_id_fkey(*)
         `
         )
         .eq("landlord_id", landlordId)

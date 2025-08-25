@@ -44,5 +44,8 @@ export const APP_CONFIG = {
 };
 
 export const getCountyPrice = (county: string): number => {
-  return APP_CONFIG.countyPricing[county] || APP_CONFIG.defaultPrice;
+  return (
+    APP_CONFIG.countyPricing[county as keyof typeof APP_CONFIG.countyPricing] ||
+    APP_CONFIG.defaultPrice
+  );
 };
