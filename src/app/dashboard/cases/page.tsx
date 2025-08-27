@@ -10,6 +10,10 @@ import {
   Calendar,
   MapPin,
   User,
+  ShoppingCart,
+  CheckCircle,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { EvictionLetterRequestModal } from "@/components/forms/eviction-letter-request-modal";
@@ -24,6 +28,8 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { DeleteCaseConfirmationModal } from "@/components/forms/delete-case-confirmation-modal";
 import { CaseDetailsModal } from "@/components/forms/case-details-modal";
+import { useCartItems } from "@/hooks/queries";
+import { useRouter } from "next/navigation";
 
 interface EvictionCase {
   id: string;
@@ -52,9 +58,11 @@ export default function EvictionLettersPage() {
   const [selectedCaseForDetails, setSelectedCaseForDetails] =
     useState<EvictionCase | null>(null);
 
+  const router = useRouter();
   const { user } = useAuth();
   const { data: legalCases, isLoading, error } = useLegalCases(user?.id);
   const { data: tenants } = useTenants(user?.id);
+  const { data: cartItems = [] } = useCartItems();
   const createLegalCaseMutation = useCreateLegalCase();
   const deleteLegalCaseMutation = useDeleteLegalCase();
 
@@ -125,8 +133,23 @@ export default function EvictionLettersPage() {
     }
   };
 
+  // Helper functions for cart integration
+  const isInCart = (caseId: string) => {
+    return cartItems?.some((item) => item.id === caseId);
+  };
+
+  const getCartItemCount = () => {
+    return cartItems?.length;
+  };
+
+  const getDraftCasesCount = () => {
+    return evictionCases.filter((c) => c.status === "NOTICE_DRAFT").length;
+  };
+
   const handleAddToCart = (caseId: string) => {
-    console.log("Add to cart:", caseId);
+    // Navigate to cart page - NOTICE_DRAFT cases automatically appear in cart
+    router.push("/dashboard/cart");
+    toast.success("Redirecting to cart to process payment...");
   };
 
   const handleDeleteDraft = (caseId: string) => {
@@ -314,20 +337,64 @@ export default function EvictionLettersPage() {
   return (
     <div className="space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white rounded-lg shadow-sm p-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Eviction Letters</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your eviction cases and legal documents
-          </p>
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Eviction Letters
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your eviction cases and legal documents
+            </p>
+          </div>
+          <div className="flex items-center space-x-3 mt-4 sm:mt-0">
+            {(getCartItemCount() || 0) > 0 && (
+              <Button
+                variant="outline"
+                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                onClick={() => router.push("/dashboard/cart")}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                View Cart ({getCartItemCount()})
+              </Button>
+            )}
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleNewRequest}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Case
+            </Button>
+          </div>
         </div>
-        <Button
-          className="mt-4 sm:mt-0 bg-green-600 hover:bg-green-700"
-          onClick={handleNewRequest}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Submit New Request
-        </Button>
+
+        {/* Cart Status Summary */}
+        {getDraftCasesCount() > 0 && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    {getDraftCasesCount()} draft case
+                    {getDraftCasesCount() > 1 ? "s" : ""} ready for processing
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Complete payment to make cases available to contractors
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => router.push("/dashboard/cart")}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Process Payment
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cases List */}
@@ -359,13 +426,25 @@ export default function EvictionLettersPage() {
                 <div className="flex flex-wrap gap-2">
                   {evictionCase.status === "NOTICE_DRAFT" && (
                     <>
-                      <Button
-                        onClick={() => handleAddToCart(evictionCase.id)}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        Go to Cart to Pay
-                      </Button>
+                      {isInCart(evictionCase.id) ? (
+                        <Button
+                          onClick={() => handleAddToCart(evictionCase.id)}
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          In Cart - Process Payment
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleAddToCart(evictionCase.id)}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Go to Cart to Pay
+                        </Button>
+                      )}
                       <Button
                         onClick={() => handleDeleteDraft(evictionCase.id)}
                         variant="destructive"
@@ -386,6 +465,12 @@ export default function EvictionLettersPage() {
                   {evictionCase.status === "SUBMITTED" &&
                     evictionCase.paymentStatus === "PAID" && (
                       <>
+                        <div className="flex items-center px-3 py-1 bg-green-100 rounded-full">
+                          <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                          <span className="text-sm font-medium text-green-800">
+                            Available to Contractors
+                          </span>
+                        </div>
                         <Button
                           onClick={() =>
                             handleGenerateDocument(evictionCase.id)
@@ -406,6 +491,42 @@ export default function EvictionLettersPage() {
                         </Button>
                       </>
                     )}
+
+                  {evictionCase.status === "IN_PROGRESS" && (
+                    <>
+                      <div className="flex items-center px-3 py-1 bg-yellow-100 rounded-full">
+                        <Clock className="h-4 w-4 text-yellow-600 mr-2" />
+                        <span className="text-sm font-medium text-yellow-800">
+                          Contractor Working
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() => handleViewDetails(evictionCase.id)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        View Details
+                      </Button>
+                    </>
+                  )}
+
+                  {evictionCase.status === "COMPLETE" && (
+                    <>
+                      <div className="flex items-center px-3 py-1 bg-purple-100 rounded-full">
+                        <CheckCircle className="h-4 w-4 text-purple-600 mr-2" />
+                        <span className="text-sm font-medium text-purple-800">
+                          Completed
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() => handleViewDetails(evictionCase.id)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        View Details
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -476,6 +597,38 @@ export default function EvictionLettersPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Cart/Status Indicator */}
+              {evictionCase.status === "NOTICE_DRAFT" &&
+                isInCart(evictionCase.id) && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <ShoppingCart className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">
+                        Ready for payment in cart
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Complete checkout to make this case available to
+                      contractors
+                    </p>
+                  </div>
+                )}
+
+              {evictionCase.status === "SUBMITTED" &&
+                evictionCase.paymentStatus === "PAID" && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900">
+                        Payment completed - Available to contractors
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-700 mt-1">
+                      Contractors can now claim and begin work on this case
+                    </p>
+                  </div>
+                )}
             </CardContent>
           </Card>
         ))}

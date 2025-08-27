@@ -19,3 +19,6 @@ export * from "./use-law-firms";
 // Contractor hooks
 export * from "./use-contractors";
 export * from "./use-contractor-jobs";
+
+// Checkout hooks
+export * from "./use-checkout";

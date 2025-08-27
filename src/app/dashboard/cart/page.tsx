@@ -1,8 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Trash2,
   CreditCard,
@@ -10,72 +22,178 @@ import {
   User,
   MapPin,
   DollarSign,
+  ShoppingCart,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
-
-interface CartItem {
-  id: string;
-  requestType: string;
-  referenceId: string;
-  courtCaseNumber: string;
-  tenantName: string;
-  propertyAddress: string;
-  price: number;
-}
+import {
+  useCartItems,
+  useRemoveFromCart,
+  useCartTotals,
+  useCartValidation,
+  useProcessCheckout,
+} from "@/hooks/queries";
+import { CheckoutParams } from "@/services/checkout-service";
+import { CartItem } from "@/types";
+import { useAuth } from "@/components/providers/auth-provider";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function CartPage() {
-  // Dummy data based on the image - will be replaced with real data later
-  const cartItems: CartItem[] = [
-    {
-      id: "1",
-      requestType: "Eviction Letter Request",
-      referenceId: "case_1",
-      courtCaseNumber: "D-01-CV-24-111111",
-      tenantName: "John Doe",
-      propertyAddress: "123 Oak St",
-      price: 80.0,
-    },
-  ];
+  const { user } = useAuth();
+  const router = useRouter();
+  const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState<string | null>(null);
 
-  const total = cartItems.reduce((sum, item) => sum + item.price, 0);
+  // Fetch cart data
+  const { data: cartItems = [], isLoading, error, refetch } = useCartItems();
+  const removeFromCartMutation = useRemoveFromCart();
+  const processCheckoutMutation = useProcessCheckout();
 
-  const handleRemoveItem = (itemId: string) => {
-    console.log("Remove item:", itemId);
+  // Calculate totals
+  const { subtotal, processingFee, tax, total, itemCount } = useCartTotals(
+    cartItems || []
+  );
+  const { isValid, errors, canCheckout } = useCartValidation(cartItems || []);
+
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      await removeFromCartMutation.mutateAsync(itemId);
+      setItemToRemove(null);
+    } catch (error) {
+      // Error is handled by the mutation hook
+    }
   };
 
-  const handleProceedToCheckout = () => {
-    console.log("Proceed to checkout");
-    // Will implement Stripe checkout later
+  const handleProceedToCheckout = async () => {
+    if (!canCheckout || !user?.id) {
+      toast.error("Cannot proceed to checkout");
+      return;
+    }
+
+    const checkoutParams: CheckoutParams = {
+      caseIds: (cartItems || [])?.map((item) => item.id),
+      paymentMethod: "simulated",
+      notes: "Simulated checkout for legal case processing",
+    };
+
+    try {
+      const result = await processCheckoutMutation.mutateAsync(checkoutParams);
+
+      if (result?.success) {
+        // Redirect to success page
+        router.push(`/dashboard/checkout/success?txn=${result?.transactionId}`);
+      }
+    } catch (error) {
+      // Error is handled by the mutation hook
+    } finally {
+      setShowCheckoutDialog(false);
+    }
   };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
+  };
+
+  if (error) {
+    return (
+      <div className="space-y-6 px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h1 className="text-2xl font-bold text-gray-900">Your Cart</h1>
+          <p className="text-red-600 mt-1">
+            Error loading cart: {error.message}
+          </p>
+          <Button onClick={() => refetch()} className="mt-4">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900">Your Cart</h1>
-        <p className="text-gray-600 mt-1">
-          Review your eviction requests before payment
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Your Cart</h1>
+            <p className="text-gray-600 mt-1">
+              Review your eviction requests before processing ({itemCount}{" "}
+              items)
+            </p>
+          </div>
+          {(cartItems?.length || 0) > 0 && (
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(total)}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {cartItems.length > 0 ? (
+      {isLoading ? (
+        // Loading State
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            {[...Array(2)].map((_, i) => (
+              <Card key={i} className="bg-white shadow-sm">
+                <CardHeader>
+                  <Skeleton className="h-6 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-20 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="lg:col-span-1">
+            <Card className="bg-white shadow-sm">
+              <CardHeader>
+                <Skeleton className="h-6 w-1/3" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-32 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : (cartItems?.length || 0) > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {cartItems.map((item) => (
+            {(cartItems || [])?.map((item) => (
               <Card key={item.id} className="bg-white shadow-sm">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
-                      {item.requestType}
-                    </CardTitle>
+                    <div className="flex items-center space-x-3">
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {item.requestType}
+                      </CardTitle>
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-700 border-blue-200"
+                      >
+                        {item.caseType}
+                      </Badge>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveItem(item.id)}
+                      onClick={() => setItemToRemove(item.id)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={removeFromCartMutation.isPending}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {removeFromCartMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </CardHeader>
@@ -86,13 +204,17 @@ export default function CartPage() {
                     <div className="space-y-2">
                       <div className="flex items-center text-sm text-gray-500">
                         <FileText className="h-4 w-4 mr-1" />
-                        Reference
+                        Case Details
                       </div>
                       <p className="font-medium text-gray-900">
-                        Ref: {item.referenceId}
+                        Ref: {item.referenceId.slice(0, 8)}...
                       </p>
                       <p className="text-sm text-gray-600">
                         Court Case #: {item.courtCaseNumber}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Initiated:{" "}
+                        {new Date(item.dateInitiated).toLocaleDateString()}
                       </p>
                     </div>
 
@@ -102,8 +224,18 @@ export default function CartPage() {
                         Price
                       </div>
                       <p className="text-lg font-bold text-gray-900">
-                        ${item.price.toFixed(2)}
+                        {formatCurrency(item.price)}
                       </p>
+                      <Badge
+                        variant={
+                          item.status === "NOTICE_DRAFT"
+                            ? "secondary"
+                            : "default"
+                        }
+                        className="text-xs"
+                      >
+                        {item.status}
+                      </Badge>
                     </div>
                   </div>
 
@@ -144,50 +276,25 @@ export default function CartPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Request Details Table */}
+                {/* Pricing Breakdown */}
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-900">
-                      Request Details
+                    <span className="text-gray-600">
+                      Subtotal ({itemCount} items):
                     </span>
-                    <span className="font-medium text-gray-900">Tenant(s)</span>
-                    <span className="font-medium text-gray-900">Property</span>
-                    <span className="font-medium text-gray-900">Price</span>
+                    <span className="font-medium">
+                      {formatCurrency(subtotal)}
+                    </span>
                   </div>
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="text-sm space-y-2">
-                      {cartItems.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-start py-2"
-                        >
-                          <div className="flex-1 pr-2">
-                            <p className="font-medium text-gray-900">
-                              {item.requestType}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Ref: {item.referenceId}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Court Case #: {item.courtCaseNumber}
-                            </p>
-                          </div>
-                          <div className="flex-1 px-2">
-                            <p className="text-gray-900">{item.tenantName}</p>
-                          </div>
-                          <div className="flex-1 px-2">
-                            <p className="text-gray-900">
-                              {item.propertyAddress}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-gray-900">
-                              ${item.price.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Processing Fee (3%):</span>
+                    <span className="font-medium">
+                      {formatCurrency(processingFee)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Tax (8.25%):</span>
+                    <span className="font-medium">{formatCurrency(tax)}</span>
                   </div>
                 </div>
 
@@ -197,26 +304,49 @@ export default function CartPage() {
                     <span className="text-lg font-semibold text-gray-900">
                       Total:
                     </span>
-                    <span className="text-lg font-bold text-gray-900">
-                      ${total.toFixed(2)}
+                    <span className="text-lg font-bold text-green-600">
+                      {formatCurrency(total)}
                     </span>
                   </div>
                 </div>
 
+                {/* Validation Errors */}
+                {!isValid && errors.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-red-800">
+                      Cannot proceed:
+                    </p>
+                    <ul className="text-xs text-red-700 mt-1 list-disc list-inside">
+                      {errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Checkout Button */}
                 <Button
-                  onClick={handleProceedToCheckout}
+                  onClick={() => setShowCheckoutDialog(true)}
                   className="w-full bg-green-600 hover:bg-green-700 py-3"
                   size="lg"
+                  disabled={!canCheckout || processCheckoutMutation.isPending}
                 >
-                  <CreditCard className="h-5 w-5 mr-2" />
-                  Proceed to Checkout (Simulated)
+                  {processCheckoutMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-5 w-5 mr-2" />
+                      Proceed to Checkout
+                    </>
+                  )}
                 </Button>
 
                 {/* Security Notice */}
                 <div className="text-xs text-gray-500 text-center pt-2">
-                  🔒 Your payment information is secured with 256-bit SSL
-                  encryption
+                  🔒 Simulated payment processing for demonstration
                 </div>
               </CardContent>
             </Card>
@@ -226,21 +356,103 @@ export default function CartPage() {
         // Empty Cart State
         <div className="text-center py-12 bg-white rounded-lg shadow-sm">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <CreditCard className="h-12 w-12 text-gray-400" />
+            <ShoppingCart className="h-12 w-12 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Your cart is empty
           </h3>
           <p className="text-gray-500 mb-6">
-            Add some eviction requests to get started.
+            Create legal cases to add eviction requests to your cart.
           </p>
           <Link href="/dashboard/cases">
             <Button className="bg-green-600 hover:bg-green-700">
-              Browse Eviction Cases
+              <FileText className="h-4 w-4 mr-2" />
+              Create Legal Cases
             </Button>
           </Link>
         </div>
       )}
+
+      {/* Remove Item Confirmation Dialog */}
+      <AlertDialog
+        open={!!itemToRemove}
+        onOpenChange={() => setItemToRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this item from your cart? This
+              will permanently delete the legal case.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => itemToRemove && handleRemoveItem(itemToRemove)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Checkout Confirmation Dialog */}
+      <AlertDialog
+        open={showCheckoutDialog}
+        onOpenChange={setShowCheckoutDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Checkout</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to process {itemCount} eviction request
+              {itemCount > 1 ? "s" : ""} for a total of {formatCurrency(total)}.
+              This will submit the cases for contractor assignment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="my-4 p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Processing Fee:</span>
+                <span>{formatCurrency(processingFee)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax:</span>
+                <span>{formatCurrency(tax)}</span>
+              </div>
+              <div className="flex justify-between font-semibold border-t pt-2">
+                <span>Total:</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleProceedToCheckout}
+              className="bg-green-600 hover:bg-green-700"
+              disabled={processCheckoutMutation.isPending}
+            >
+              {processCheckoutMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Confirm & Process"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

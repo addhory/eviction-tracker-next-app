@@ -214,6 +214,31 @@ export interface ContractorUpdateData {
   phone?: string;
 }
 
+// Cart and Checkout Types
+export interface CartItem {
+  id: string;
+  referenceId: string;
+  requestType: string;
+  courtCaseNumber: string;
+  tenantName: string;
+  propertyAddress: string;
+  price: number;
+  caseType: CaseType;
+  dateInitiated: string;
+  status: CaseStatus;
+  paymentStatus: PaymentStatus;
+}
+
+export interface CheckoutResult {
+  success: boolean;
+  transactionId: string;
+  totalAmount: number;
+  caseIds: string[];
+  processedAt: string;
+  paymentMethod: "simulated" | "stripe";
+  error?: string;
+}
+
 // Dashboard Stats
 export interface DashboardStats {
   totalProperties: number;
